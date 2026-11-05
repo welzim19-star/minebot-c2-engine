@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSJ3 Control Panel</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { background: #0f0f0f; color: #00ff00; font-family: 'Courier New', monospace; text-align: center; }
+        .stats { border: 2px solid #00ff00; margin: 20px; padding: 15px; border-radius: 10px; }
+        .btn { 
+            background: #222; color: #00ff00; border: 2px solid #00ff00; 
+            padding: 20px; width: 80%; margin: 10px; font-weight: bold; font-size: 1.2em;
+            cursor: pointer; border-radius: 5px;
+        }
+        .btn:active { background: #00ff00; color: #000; }
+        #log { font-size: 0.8em; color: #888; }
+    </style>
+</head>
+<body>
+    <h1>MINEBOT SSJ3 C2</h1>
+    
+    <div class="stats">
+        <p>Vida: <span id="hp">--</span> | Fome: <span id="food">--</span></p>
+        <p>Posição: <span id="pos">--</span></p>
+    </div>
+
+    <button class="btn" onclick="sendCommand('start_farm')">INICIAR FARM</button>
+    <button class="btn" onclick="sendCommand('combat_mode')">MODO COMBATE</button>
+    <button class="btn" onclick="sendCommand('stop')" style="border-color: #ff0000; color: #ff0000;">PARAR TUDO</button>
+
+    <p id="log">Aguardando conexão...</p>
+
+    <script>
+        const socket = io();
+
+        socket.on('status_update', (data) => {
+            document.getElementById('hp').innerText = data.health;
+            document.getElementById('food').innerText = data.food;
+            document.getElementById('pos').innerText = `${data.pos.x}, ${data.pos.y}, ${data.pos.z}`;
+            document.getElementById('log').innerText = "Sistema conectado e recebendo telemetria.";
+        });
+
+        function sendCommand(action) {
+            socket.emit('execute_action', { action: action });
+            document.getElementById('log').innerText = "Comando enviado: " + action;
+        }
+    </script>
+</body>
+</html>
