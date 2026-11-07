@@ -24,7 +24,7 @@ flowchart TD
     subgraph OPERATOR_TIER["Operator Interface Tier"]
         CLI["Interactive CLI / Terminal Console"]
         WebUI["Mobile / Desktop Responsive Web HUD"]
-        LAN["LAN UDP Broadcast Scanner\n(Auto World Discovery)"]
+        LAN["LAN UDP Broadcast Scanner<br/>(Auto World Discovery)"]
     end
 
     subgraph C2_GATEWAY["Central Command & Control (C2) Hub"]
@@ -37,11 +37,11 @@ flowchart TD
     end
 
     subgraph AUTONOMOUS_MODULES["Execution & Autonomous Logic Tier"]
-        Mining["Mining Pro Engine\n(Strip Mining Y:11 / Anti-Freeze)"]
-        Combat["Combat & Threat Module\n(Weapon Swapping / Target Tracking)"]
-        Inventory["Inventory, Crafting & Smelting Hub\n(Recipe Solver / Furnace Automation)"]
-        Pathfinder["3D A* Pathfinder & Kinematics\n(Heuristic Obstacle Traversal)"]
-        Builder["Builder & Farming Pro Engine\n(Schematics & Resource Gathering)"]
+        Mining["Mining Pro Engine<br/>(Strip Mining Y:11 / Anti-Freeze)"]
+        Combat["Combat & Threat Module<br/>(Weapon Swapping / Target Tracking)"]
+        Inventory["Inventory, Crafting & Smelting Hub<br/>(Recipe Solver / Furnace Automation)"]
+        Pathfinder["3D A* Pathfinder & Kinematics<br/>(Heuristic Obstacle Traversal)"]
+        Builder["Builder & Farming Pro Engine<br/>(Schematics & Resource Gathering)"]
     end
 
     subgraph MINECRAFT_SERVER["Target Minecraft Java Server (LAN / WAN)"]
