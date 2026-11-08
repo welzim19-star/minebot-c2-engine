@@ -21,36 +21,36 @@ O motor desacopla a execução das ações no mundo virtual do plano de comando 
 
 ```mermaid
 flowchart TD
-    subgraph OPERATOR_TIER["Camada de Interface do Operador"]
-        CLI["Console Interativo de Terminal"]
-        WebUI["HUD Web Responsivo para Mobile / Desktop"]
-        LAN["Scanner de Broadcast UDP na LAN\n(Autodescoberta de Mundos)"]
+    subgraph OPERATOR_TIER["Interface do Operador"]
+        CLI["Console Terminal"]
+        WebUI["Web HUD Responsivo"]
+        LAN["Scanner UDP na LAN"]
     end
 
-    subgraph C2_GATEWAY["Central de Comando & Controle (C2)"]
+    subgraph C2_GATEWAY["Central de Comando C2"]
         ExpressServer["Servidor HTTP Express"]
-        SocketEngine["Despachador em Tempo Real Socket.io"]
-        CmdRouter["Roteador de Eventos e Comandos"]
+        SocketEngine["Despachador Socket.io"]
+        CmdRouter["Roteador de Comandos"]
         
         ExpressServer --- SocketEngine
         SocketEngine --> CmdRouter
     end
 
-    subgraph AUTONOMOUS_MODULES["Camada de Execução e Lógica Autônoma"]
-        Mining["Motor Mining Pro\n(Strip Mining Y:11 / Anti-Freeze)"]
-        Combat["Módulo de Combate e Ameaças\n(Troca Dinâmica de Armas / Perseguição)"]
-        Inventory["Central de Inventário, Forja e Crafting\n(Resolução de Receitas / Automação de Fornalhas)"]
-        Pathfinder["Navegação 3D A* e Cinemática\n(Transposição Heurística de Obstáculos)"]
-        Builder["Motor de Construção e Agricultura\n(Schematics e Coleta de Recursos)"]
+    subgraph AUTONOMOUS_MODULES["Módulos de Execução Autônoma"]
+        Mining["Motor Mining Pro"]
+        Combat["Módulo de Combate"]
+        Inventory["Hub de Inventário & Crafting"]
+        Pathfinder["Navegação 3D A*"]
+        Builder["Motor de Construção"]
     end
 
-    subgraph MINECRAFT_SERVER["Servidor Minecraft Java Alvo (LAN / WAN)"]
-        MC["Servidor Minecraft (Paper / Spigot / Vanilla)"]
+    subgraph MINECRAFT_SERVER["Servidor Minecraft Java Alvo"]
+        MC["Servidor Minecraft (Spigot / Paper)"]
     end
 
-    OPERATOR_TIER -- "Eventos HTTP / WebSocket" --> C2_GATEWAY
-    C2_GATEWAY -- "Mutação de Estado Assíncrona" --> AUTONOMOUS_MODULES
-    AUTONOMOUS_MODULES -- "Pacotes TCP (API Mineflayer)" --> MINECRAFT_SERVER
+    OPERATOR_TIER -- "Eventos WebSocket" --> C2_GATEWAY
+    C2_GATEWAY -- "Mutação de Estado" --> AUTONOMOUS_MODULES
+    AUTONOMOUS_MODULES -- "Pacotes TCP do Bot" --> MINECRAFT_SERVER
 ```
 
 ---

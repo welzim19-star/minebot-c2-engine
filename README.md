@@ -22,35 +22,35 @@ The engine decouples low-level packet-driven gameplay execution from the operato
 ```mermaid
 flowchart TD
     subgraph OPERATOR_TIER["Operator Interface Tier"]
-        CLI["Interactive CLI / Terminal Console"]
-        WebUI["Mobile / Desktop Responsive Web HUD"]
-        LAN["LAN UDP Broadcast Scanner<br/>(Auto World Discovery)"]
+        CLI["Terminal Console"]
+        WebUI["Responsive Web HUD"]
+        LAN["LAN UDP Scanner"]
     end
 
-    subgraph C2_GATEWAY["Central Command & Control (C2) Hub"]
-        ExpressServer["Express HTTP Asset Server"]
-        SocketEngine["Socket.io Real-Time Dispatcher"]
-        CmdRouter["Command Parser & Event Dispatcher"]
+    subgraph C2_GATEWAY["Central C2 Hub"]
+        ExpressServer["Express HTTP Server"]
+        SocketEngine["Socket.io Dispatcher"]
+        CmdRouter["Command Router"]
         
         ExpressServer --- SocketEngine
         SocketEngine --> CmdRouter
     end
 
-    subgraph AUTONOMOUS_MODULES["Execution & Autonomous Logic Tier"]
-        Mining["Mining Pro Engine<br/>(Strip Mining Y:11 / Anti-Freeze)"]
-        Combat["Combat & Threat Module<br/>(Weapon Swapping / Target Tracking)"]
-        Inventory["Inventory, Crafting & Smelting Hub<br/>(Recipe Solver / Furnace Automation)"]
-        Pathfinder["3D A* Pathfinder & Kinematics<br/>(Heuristic Obstacle Traversal)"]
-        Builder["Builder & Farming Pro Engine<br/>(Schematics & Resource Gathering)"]
+    subgraph AUTONOMOUS_MODULES["Execution & Logic Tier"]
+        Mining["Mining Pro Engine"]
+        Combat["Combat Threat Module"]
+        Inventory["Inventory & Crafting Hub"]
+        Pathfinder["3D A* Pathfinder"]
+        Builder["Builder Farming Engine"]
     end
 
-    subgraph MINECRAFT_SERVER["Target Minecraft Java Server (LAN / WAN)"]
-        MC["Minecraft Server (Paper / Spigot / Vanilla)"]
+    subgraph MINECRAFT_SERVER["Target Minecraft Java Server"]
+        MC["Minecraft Server (Spigot / Paper)"]
     end
 
-    OPERATOR_TIER -- "HTTP / WebSocket Events" --> C2_GATEWAY
+    OPERATOR_TIER -- "WebSocket Events" --> C2_GATEWAY
     C2_GATEWAY -- "Async State Mutation" --> AUTONOMOUS_MODULES
-    AUTONOMOUS_MODULES -- "TCP Bot Packets (Mineflayer API)" --> MINECRAFT_SERVER
+    AUTONOMOUS_MODULES -- "TCP Bot Packets" --> MINECRAFT_SERVER
 ```
 
 ---
