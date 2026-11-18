@@ -1,10 +1,11 @@
 // module_smelting.js
-// Responsabilidade: Operação de Fornalhas e Fundição Térmica.
+// V2.0: Prevenção de Memory Leak e Cache de Instância
 
 const { goals } = require('mineflayer-pathfinder');
+let mcDataCache = null; // $O(1)$ Cache global para o módulo
 
 function carregarModuloSmelting(bot) {
-    console.log('[MÓDULO] Sistema de Fundição Térmica (Smelting) ativado.');
+    console.log('[MÓDULO] Sistema de Fundição Térmica (Anti-Leak) ativado.');
 
     bot.on('chat', async (username, message) => {
         if (username === bot.username) return;
@@ -18,18 +19,16 @@ function carregarModuloSmelting(bot) {
 }
 
 async function executarFornalha(bot) {
-    const mcData = require('minecraft-data')(bot.version);
-    const fornalhaBloco = bot.findBlock({ matching: mcData.blocksByName.furnace.id, maxDistance: 15 });
+    if (!mcDataCache) mcDataCache = require('minecraft-data')(bot.version); // Carrega apenas 1x
+    const fornalhaBloco = bot.findBlock({ matching: mcDataCache.blocksByName.furnace.id, maxDistance: 15 });
 
     if (!fornalhaBloco) return bot.chat("Logística: Preciso de uma fornalha posicionada no ambiente para isso.");
 
-    // Busca combustível
     const combustivel = bot.inventory.items().find(i => ['coal', 'charcoal', 'oak_log', 'oak_planks'].includes(i.name));
-    if (!combustivel) return bot.chat("Falta de recursos: Não tenho combustível (carvão ou madeira).");
+    if (!combustivel) return bot.chat("Falta de recursos: Não tenho combustível.");
 
-    // Busca minérios ou carnes cruas
     const minerio = bot.inventory.items().find(i => 
-        ['iron_ore', 'gold_ore', 'beef', 'chicken', 'porkchop', 'mutton', 'potato', 'cobblestone'].includes(i.name)
+        ['iron_ore', 'gold_ore', 'beef', 'chicken', 'porkchop', 'mutton', 'potato', 'cobblestone', 'raw_iron'].includes(i.name)
     );
 
     if (!minerio) return bot.chat("Não tenho minérios ou comida crua no inventário para fundir.");
@@ -38,30 +37,40 @@ async function executarFornalha(bot) {
         await bot.pathfinder.goto(new goals.GoalGetToBlock(fornalhaBloco.position.x, fornalhaBloco.position.y, fornalhaBloco.position.z));
         const furnace = await bot.openFurnace(fornalhaBloco);
         
-        bot.chat(`Adicionando combustível e inserindo ${minerio.name} na fornalha...`);
-
-        // Insere 1 unidade de combustível e 1 unidade do item
+        bot.chat(`Inserindo ${minerio.name} na fornalha...`);
         await furnace.putFuel(combustivel.type, null, 1);
         await furnace.putInput(minerio.type, null, 1);
 
-        bot.chat("Aguardando o processamento térmico (aproximadamente 10 segundos)...");
+        bot.chat("Aguardando o processamento térmico (aprox. 10s)...");
 
-        // Fica observando o fogo da fornalha
-        furnace.on('update', async () => {
-            // Se o progresso terminar e houver um item na saída
-            if (furnace.outputItem) {
-                bot.chat("Processo concluído. Extraindo resultado...");
-                await furnace.takeOutput();
-                await furnace.close();
-                bot.chat("Item assado/fundido armazenado com sucesso no inventário.");
-                // Remove o evento para não causar memory leak
-                furnace.removeAllListeners('update'); 
-            }
+        // Blindagem contra Memory Leak: Promisificamos o evento e garantimos remoção
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                furnace.removeAllListeners('update');
+                reject(new Error("Timeout na fornalha"));
+            }, 15000);
+
+            const onUpdate = async () => {
+                if (furnace.outputItem) {
+                    clearTimeout(timeout);
+                    furnace.removeListener('update', onUpdate);
+                    try {
+                        bot.chat("Processo concluído. Extraindo resultado...");
+                        await furnace.takeOutput();
+                        resolve();
+                    } catch(e) {
+                        reject(e);
+                    }
+                }
+            };
+            furnace.on('update', onUpdate);
         });
 
+        await furnace.close();
+        bot.chat("Item armazenado com sucesso no inventário.");
     } catch (err) {
-        bot.chat("Falha operacional ao tentar usar a fornalha.");
-        console.error(err);
+        bot.chat(`Falha operacional: ${err.message}`);
+        console.error("[SMELTING ERRO]:", err);
     }
 }
 

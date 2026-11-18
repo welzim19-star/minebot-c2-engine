@@ -1,6 +1,6 @@
 /**
- * PROJETO: MINEBOT SSJ3 - NÚCLEO C2 (COMMAND & CONTROL)
- * OBJETIVO: Execução de rotinas de farm/combate com interface LAN
+- PROJETO: MINEBOT SSJ3 - NÚCLEO C2 (COMMAND & CONTROL)
+- OBJETIVO: C2 Gateway Zero-Trust (PIN Auth) e Event Loop Principal
  */
 
 const mineflayer = require('mineflayer');
@@ -11,76 +11,94 @@ const path = require('path');
 const readline = require('readline');
 const { encontrarServidorLan } = require('./lan_scanner');
 const { pathfinder, Movements } = require('mineflayer-pathfinder');
-// const autoEat = require('mineflayer-auto-eat').plugin || require('mineflayer-auto-eat').loader || require('mineflayer-auto-eat');
 const toolPlugin = require('mineflayer-tool').plugin;
+const crypto = require('crypto');
+
+// Import dos Módulos Essenciais (Com as funções reais para o HUD)
 const { carregarModuloAcoes } = require('./module_actions');
 const { carregarModuloCombate } = require('./module_combat');
-const { carregarModuloMiningPro } = require('./module_mining_pro');
+const { carregarModuloMiningPro, iniciarStripMining } = require('./module_mining_pro');
 const { carregarModuloCrafting } = require('./module_crafting');
 const { carregarModuloMovimento } = require('./module_movement');
 const { carregarModuloBuilder } = require('./module_builder');
 const { carregarModuloHome } = require('./module_home');
 const { carregarModuloSmelting } = require('./module_smelting');
 const { carregarModuloVisao } = require('./module_vision');
-const { carregarModuloFarming } = require('./module_farming');
+const { carregarModuloFarming, iniciarColheita } = require('./module_farming');
 const { carregarModuloAutoProgression } = require('./module_auto_progression');
+
+// --- SEGURANÇA ZERO-TRUST (OTP PIN) ---
+const AUTH_PIN = crypto.randomInt(1000, 9999).toString();
+console.log(`\n=========================================`);
+console.log(`[ZERO-TRUST] PIN DE ACESSO DO C2: \x1b[32m${AUTH_PIN}\x1b[0m`);
+console.log(`=========================================\n`);
 
 // --- CONFIGURAÇÃO DO SERVIDOR WEB ---
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Servir a interface do celular (que criaremos abaixo)
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Middleware de Autenticação O(1)
+io.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (token === AUTH_PIN) {
+        return next();
+    }
+    console.log(`[SEGURANÇA] Droppando conexão não autorizada. (IP: ${socket.handshake.address})`);
+    return next(new Error('Acesso Negado: PIN Inválido'));
+});
 
 // --- INSTANCIAÇÃO DO BOT (MODO SSJ3) ---
 let bot;
+let botEmOperacao = false;
 
 async function iniciarBot() {
+    if (botEmOperacao) return;
+    botEmOperacao = true;
+
     try {
         console.log('\n[SISTEMA] Aguardando o Minecraft abrir o mundo na LAN...');
         console.log('[SISTEMA] Se o bot não detectar sozinho (por causa do Firewall), DIGITE A PORTA ABAIXO e aperte ENTER:');
 
-        let portaLan = null;
-
-        // Cria a interface de leitura do terminal
         const rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout
         });
 
-        // Tenta achar a porta automaticamente ou pela digitação do usuário
-        portaLan = await new Promise((resolve) => {
-            // Fica escutando a digitação
+        const portaLan = await new Promise((resolve) => {
+            let resolvido = false;
+            const finalizar = (p) => {
+                if (!resolvido) {
+                    resolvido = true;
+                    rl.close();
+                    resolve(p);
+                }
+            };
+
             rl.question('', (resposta) => {
                 const p = parseInt(resposta.trim());
                 if (!isNaN(p)) {
-                    console.log(`[MANUAL] Porta inserida manualmente: ${p}`);
-                    resolve(p);
+                    console.log(`[MANUAL] Porta inserida: ${p}`);
+                    finalizar(p);
                 }
             });
 
-            // E tenta achar pela LAN ao mesmo tempo
-            encontrarServidorLan(120000).then((porta) => {
-                resolve(porta);
-            }).catch(() => {});
+            encontrarServidorLan(120000).then((porta) => finalizar(porta)).catch(() => {});
         });
-
-        rl.close();
 
         const botOptions = {
             host: '127.0.0.1', 
             port: portaLan,
             username: 'Minebot_SSJ3',
-            version: false // "false" faz o bot descobrir a versão sozinho!
+            version: false
         };
 
         console.log(`[SISTEMA] Servidor detectado na porta ${portaLan}. Conectando o bot...`);
         bot = mineflayer.createBot(botOptions);
 
-        // --- CARREGAMENTO DE PLUGINS E MÓDULOS ---
         bot.loadPlugin(pathfinder);
-        // bot.loadPlugin(autoEat);
         bot.loadPlugin(toolPlugin);
 
         carregarModuloAcoes(bot);
@@ -95,33 +113,23 @@ async function iniciarBot() {
         carregarModuloFarming(bot);
         carregarModuloAutoProgression(bot);
 
-        // --- EVENTOS DO BOT ---
         bot.on('kicked', (razao) => console.log('[KICKED]', razao));
         bot.on('error', (err) => console.log('[ERRO BOT]', err));
+        
         bot.on('spawn', () => {
             console.log('[SUCESSO] Bot logado no jogo!');
-            // Configurar movimentos do pathfinder
             const mcData = require('minecraft-data')(bot.version);
             const defaultMove = new Movements(bot, mcData);
-            defaultMove.canDig = true; // Permite que o bot quebre blocos para se mover
+            defaultMove.canDig = true;
             bot.pathfinder.setMovements(defaultMove);
         });
 
-        // Configurar auto-eat (TEMPORARIAMENTE DESATIVADO devido a falha da biblioteca)
-        // se precisar no futuro, implementaremos manualmente
-        // bot.autoEat.options = { priority: 'foodPoints', startAt: 14, bannedFood: [] };
-        // bot.on('health', () => { if (bot.autoEat && bot.food < 15) bot.autoEat.eat(); });
-
-        // LOG DE TUDO NO TERMINAL E CONTATO VISUAL
         bot.on('chat', async (username, message) => {
             if(username !== bot.username) {
                 console.log(`[JOGO - ${username}]: ${message}`);
-                // Olha para o jogador que falou
                 const player = bot.players[username];
                 if (player && player.entity && !bot.pathfinder.isMoving()) {
-                    try {
-                        await bot.lookAt(player.entity.position.offset(0, player.entity.height, 0));
-                    } catch (e) {}
+                    try { await bot.lookAt(player.entity.position.offset(0, player.entity.height, 0)); } catch (e) {}
                 }
             }
         });
@@ -131,15 +139,15 @@ async function iniciarBot() {
             console.log(`[BOT FALOU]: ${msg}`);
             oldChat.call(bot, msg);
         };
-        let mudando = false;
+
         bot.on('end', (razao) => {
-            if(mudando) return;
-            mudando = true;
+            botEmOperacao = false;
             console.log(`[SISTEMA] Bot desconectado: ${razao}. Reiniciando busca LAN em 5s...`);
             setTimeout(iniciarBot, 5000);
         });
 
     } catch (err) {
+        botEmOperacao = false;
         console.log(`[SISTEMA] Erro Crítico: ${err.message}. Buscando novamente...`);
         setTimeout(iniciarBot, 3000);
     }
@@ -147,11 +155,10 @@ async function iniciarBot() {
 
 iniciarBot();
 
-// --- LÓGICA DE COMUNICAÇÃO LAN ---
+// --- LÓGICA DE COMUNICAÇÃO LAN (SOCKET.IO) ---
 io.on('connection', (socket) => {
-    console.log('[SSJ3] Controle Mobile Conectado.');
+    console.log(`[SSJ3] Controle Mobile Conectado. (IP: ${socket.handshake.address})`);
 
-    // Enviar dados em tempo real para o celular
     const updateInterval = setInterval(() => {
         if (bot && bot.entity) {
             socket.emit('status_update', {
@@ -166,24 +173,28 @@ io.on('connection', (socket) => {
         }
     }, 1000);
 
-    // Receber comandos do celular
-    socket.on('execute_action', (data) => {
-        console.log(`[!] Comando recebido via LAN: ${data.action}`);
-        
+    socket.on('execute_action', async (data) => {
+        console.log(`[!] Comando C2 validado recebido: ${data.action}`);
+        if (!bot) return;
+
         switch(data.action) {
             case 'start_farm':
-                if(bot) bot.chat('Iniciando protocolo de mineração...');
-                // Insira aqui sua função de farm existente
+                // Executamos a subrotina direta em vez de emitir chat falso
+                iniciarColheita(bot).catch(e => console.error("[FARM ERRO]", e));
                 break;
             case 'combat_mode':
-                if(bot) bot.chat('Modo de combate SSJ3 ativado!');
-                // Insira aqui sua função de combate
+                // Vamos simular a chamada de ataque do NLP (exige alvo próximo)
+                bot.emit('chat', bot.username, 'atacar');
+                break;
+            case 'mining_pro':
+                bot.chat('Acionando Módulo Mining Pro!');
+                iniciarStripMining(bot, 11).catch(e => console.error("[MINING ERRO]", e));
                 break;
             case 'stop':
-                if(bot) {
-                    bot.chat('Encerrando atividades.');
-                    if(bot.pathfinder) bot.pathfinder.setGoal(null);
-                }
+                bot.chat('Encerrando atividades. Abortando tarefas!');
+                bot.emit('stop_all'); // Módulo Combate e Farming capturam isso
+                bot.tarefaAbortada = true; // Força parada dos Whiles
+                if (bot.pathfinder) bot.pathfinder.setGoal(null);
                 break;
         }
     });
@@ -191,11 +202,11 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => clearInterval(updateInterval));
 });
 
-// LEVANTAR O SISTEMA NA PORTA 3000
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n=========================================`);
     console.log(`SISTEMA ONLINE - PORTA ${PORT}`);
     console.log(`ACESSE NO CELULAR: http://SEU_IP_LOCAL:${PORT}`);
+    console.log(`O PIN Zero-Trust será exigido no acesso.`);
     console.log(`=========================================\n`);
 });

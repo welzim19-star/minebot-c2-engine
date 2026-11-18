@@ -2,6 +2,7 @@
 // V1: Máquina de Estados de Progressão Automática (Do zero ao Diamante com Armadura)
 
 const { executarExtracaoLote, rotinaPosicionamentoInteligente } = require('./module_actions');
+const { iniciarStripMining } = require("./module_mining_pro");
 const { executarCrafting } = require('./module_crafting');
 const { equiparMelhorFerramenta, equiparArmaduras } = require('./module_inventory');
 
@@ -192,7 +193,7 @@ async function iniciarJornada(bot) {
     bot.chat('Etapa 10/10: Preparativos concluídos. Acionando Módulo Mining Pro rumo aos Diamantes!');
     // O module_mining_pro reage a "iniciar escavacao" no chat, então o bot pode simular ou chamar direto.
     // Vamos chamar emit 'chat' para simular o comando, assim reaproveitamos.
-    bot.emit('chat', bot.username, 'iniciar escavacao');
+    await iniciarStripMining(bot, 11);
 }
 
 module.exports = { carregarModuloAutoProgression };

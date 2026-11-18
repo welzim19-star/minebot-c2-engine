@@ -11,13 +11,29 @@
         .btn { 
             background: #222; color: #00ff00; border: 2px solid #00ff00; 
             padding: 20px; width: 80%; margin: 10px; font-weight: bold; font-size: 1.2em;
-            cursor: pointer; border-radius: 5px;
+            cursor: pointer; border-radius: 5px; transition: 0.2s;
         }
         .btn:active { background: #00ff00; color: #000; }
-        #log { font-size: 0.8em; color: #888; }
+        .btn-mine { border-color: #00ffff; color: #00ffff; }
+        .btn-mine:active { background: #00ffff; color: #000; }
+        #log { font-size: 0.8em; color: #888; margin-top: 20px;}
+        #auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 999;
+        }
+        input { padding: 15px; font-size: 1.5em; text-align: center; background: #222; color: #0f0; border: 1px solid #0f0; margin-bottom: 15px;}
     </style>
 </head>
 <body>
+    <div id="auth-overlay">
+        <h2>AUTENTICAÇÃO ZERO-TRUST</h2>
+        <p>Insira o PIN do console C2:</p>
+        <input type="number" id="pinInput" placeholder="0000">
+        <button class="btn" onclick="conectar()">AUTENTICAR</button>
+        <p id="auth-erro" style="color: red;"></p>
+    </div>
+
     <h1>MINEBOT SSJ3 C2</h1>
     
     <div class="stats">
@@ -25,25 +41,45 @@
         <p>Posição: <span id="pos">--</span></p>
     </div>
 
-    <button class="btn" onclick="sendCommand('start_farm')">INICIAR FARM</button>
-    <button class="btn" onclick="sendCommand('combat_mode')">MODO COMBATE</button>
-    <button class="btn" onclick="sendCommand('stop')" style="border-color: #ff0000; color: #ff0000;">PARAR TUDO</button>
+    <button class="btn" onclick="sendCommand('start_farm')">INICIAR COLHEITA</button>
+    <button class="btn btn-mine" onclick="sendCommand('mining_pro')">MINING PRO (Y:11)</button>
+    <button class="btn" onclick="sendCommand('combat_mode')" style="border-color: #ffaa00; color: #ffaa00;">MODO COMBATE</button>
+    <button class="btn" onclick="sendCommand('stop')" style="border-color: #ff0000; color: #ff0000;">PARAR TUDO (STOP_ALL)</button>
 
-    <p id="log">Aguardando conexão...</p>
+    <p id="log">Aguardando login...</p>
 
     <script>
-        const socket = io();
+        let socket;
 
-        socket.on('status_update', (data) => {
-            document.getElementById('hp').innerText = data.health;
-            document.getElementById('food').innerText = data.food;
-            document.getElementById('pos').innerText = `${data.pos.x}, ${data.pos.y}, ${data.pos.z}`;
-            document.getElementById('log').innerText = "Sistema conectado e recebendo telemetria.";
-        });
+        function conectar() {
+            const pin = document.getElementById('pinInput').value;
+            
+            socket = io({
+                auth: { token: pin }
+            });
+
+            socket.on('connect', () => {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('log').innerText = "Sistema autenticado. Recebendo telemetria SSJ3.";
+            });
+
+            socket.on('connect_error', (err) => {
+                document.getElementById('auth-erro').innerText = "FALHA: " + err.message;
+                socket.disconnect();
+            });
+
+            socket.on('status_update', (data) => {
+                document.getElementById('hp').innerText = data.health;
+                document.getElementById('food').innerText = data.food;
+                document.getElementById('pos').innerText = `${data.pos.x}, ${data.pos.y}, ${data.pos.z}`;
+            });
+        }
 
         function sendCommand(action) {
-            socket.emit('execute_action', { action: action });
-            document.getElementById('log').innerText = "Comando enviado: " + action;
+            if (socket && socket.connected) {
+                socket.emit('execute_action', { action: action });
+                document.getElementById('log').innerText = "Protocolo enviado: " + action;
+            }
         }
     </script>
 </body>

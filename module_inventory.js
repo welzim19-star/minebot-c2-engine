@@ -1,8 +1,22 @@
 // module_inventory.js
-// V4: Logística Total (Garantia de Exportação do equiparItemExato)
+// V5: Logística Total com Ranking de Tier O(1) e Zero-Regressão
+
+const TIER_WEIGHTS = {
+    netherite: 6,
+    diamond: 5,
+    iron: 4,
+    stone: 3,
+    golden: 2,
+    wooden: 1
+};
+
+function getToolScore(itemName) {
+    const prefix = itemName.split('_')[0];
+    return TIER_WEIGHTS[prefix] || 0;
+}
 
 function carregarModuloInventario(bot) {
-    console.log('[MÓDULO] Logística V4 (Equipamentos e Blocos) ativado.');
+    console.log('[MÓDULO] Logística V5 (Ranking de Tier e Inventário) ativado.');
 
     bot.on('chat', async (username, message) => {
         if (username === bot.username) return;
@@ -21,42 +35,56 @@ function calcularOcupacao(bot) {
     return (slotsOcupados / totalSlots) * 100;
 }
 
-// Equipa ferramentas baseadas em parte do nome (ex: "pickaxe")
+// Equipa a MELHOR ferramenta disponível por tier (Netherite -> Diamond -> Iron -> Stone -> Wood)
 async function equiparMelhorFerramenta(bot, tipo) {
-    const ferramentas = bot.inventory.items().filter(i => i.name.includes(tipo));
+    const ferramentas = bot.inventory.items()
+        .filter(i => i.name.includes(tipo))
+        .sort((a, b) => getToolScore(b.name) - getToolScore(a.name));
+
     if (ferramentas.length === 0) return false;
     try {
         await bot.equip(ferramentas[0], 'hand');
         return true;
-    } catch (err) { return false; }
+    } catch (err) {
+        return false;
+    }
 }
 
-// FUNÇÃO CRÍTICA DO FIX: Equipa um bloco ou item exato (ex: "crafting_table")
+// Equipa um bloco ou item exato (ex: "crafting_table")
 async function equiparItemExato(bot, nomeExato) {
     const item = bot.inventory.items().find(i => i.name === nomeExato);
     if (!item) return false;
     try {
         await bot.equip(item, 'hand');
         return true;
-    } catch (err) { return false; }
+    } catch (err) {
+        return false;
+    }
 }
 
 async function equiparArmaduras(bot) {
     const tipos = ['head', 'torso', 'legs', 'feet'];
     const nomesArmor = ['helmet', 'chestplate', 'leggings', 'boots'];
-    
+
     for (let i = 0; i < tipos.length; i++) {
-        const armorItem = bot.inventory.items().find(item => item.name.includes(nomesArmor[i]));
-        if (armorItem) {
+        const armorCandidates = bot.inventory.items()
+            .filter(item => item.name.includes(nomesArmor[i]))
+            .sort((a, b) => getToolScore(b.name) - getToolScore(a.name));
+
+        if (armorCandidates.length > 0) {
             try {
-                await bot.equip(armorItem, tipos[i]);
-            } catch(e) {
-                console.log(`[ERRO ARMADURA] Falha ao equipar ${armorItem.name}: ${e.message}`);
+                await bot.equip(armorCandidates[0], tipos[i]);
+            } catch (e) {
+                console.log(`[ERRO ARMADURA] Falha ao equipar ${armorCandidates[0].name}: ${e.message}`);
             }
         }
     }
 }
 
-// [!] A LINHA ABAIXO É O QUE CAUSOU O ERRO. 
-// Ela precisa exportar todas as 4 funções para os outros módulos conseguirem ler.
-module.exports = { carregarModuloInventario, equiparMelhorFerramenta, calcularOcupacao, equiparItemExato, equiparArmaduras };
+module.exports = {
+    carregarModuloInventario,
+    equiparMelhorFerramenta,
+    calcularOcupacao,
+    equiparItemExato,
+    equiparArmaduras
+};

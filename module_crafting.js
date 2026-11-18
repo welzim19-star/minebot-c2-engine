@@ -1,8 +1,10 @@
 // module_crafting.js
-// V2: Crash Fix (Validação Dupla de Ingredientes)
+// V3: Parser NLP O(1) (Longest-Match First) e Cache Global
+
+let mcDataCache = null;
 
 function carregarModuloCrafting(bot) {
-    console.log('[MÓDULO] Sistema de Manufatura V2 (Anti-Crash) ativado.');
+    console.log('[MÓDULO] Sistema de Manufatura V3 (NLP Otimizado) ativado.');
 
     bot.on('chat', async (username, message) => {
         if (username === bot.username) return;
@@ -27,13 +29,13 @@ function carregarModuloCrafting(bot) {
                 'pao': 'bread', 'balde': 'bucket', 'tesoura': 'shears', 'escudo': 'shield'
             };
 
-            let itemAlvo = null;
-            Object.keys(receitasDicionario).forEach(key => {
-                if (msg.includes(key)) itemAlvo = receitasDicionario[key];
-            });
+            // LONGEST-MATCH FIRST: Ordena por tamanho da string e para no primeiro (maior) hit
+            const chavesOrdenadas = Object.keys(receitasDicionario).sort((a, b) => b.length - a.length);
+            const match = chavesOrdenadas.find(k => msg.includes(k));
 
-            if (!itemAlvo) return bot.chat('Receita não encontrada no banco de dados.');
-
+            if (!match) return bot.chat('Receita não encontrada no banco de dados.');
+            
+            const itemAlvo = receitasDicionario[match];
             const quantidade = msg.match(/\d+/) ? parseInt(msg.match(/\d+/)[0]) : 1;
             await executarCrafting(bot, itemAlvo, quantidade);
         }
@@ -41,8 +43,8 @@ function carregarModuloCrafting(bot) {
 }
 
 async function executarCrafting(bot, nomeItem, quantidade) {
-    const mcData = require('minecraft-data')(bot.version);
-    const item = mcData.itemsByName[nomeItem] || mcData.blocksByName[nomeItem];
+    if (!mcDataCache) mcDataCache = require('minecraft-data')(bot.version);
+    const item = mcDataCache.itemsByName[nomeItem] || mcDataCache.blocksByName[nomeItem];
     
     if (!item) return bot.chat(`[ERRO INTERNO] ID '${nomeItem}' inválido.`);
     bot.chat(`Calculando dependências para: ${nomeItem}...`);
@@ -52,7 +54,7 @@ async function executarCrafting(bot, nomeItem, quantidade) {
         let bancadaDeTrabalho = null;
 
         if (!receitaSemMesa || receitaSemMesa.requiresTable) {
-            const blocoMesa = bot.findBlock({ matching: mcData.blocksByName.crafting_table.id, maxDistance: 10 });
+            const blocoMesa = bot.findBlock({ matching: mcDataCache.blocksByName.crafting_table.id, maxDistance: 10 });
             if (!blocoMesa) return bot.chat('Preciso de uma Bancada de Trabalho próxima.');
             bancadaDeTrabalho = blocoMesa;
         }

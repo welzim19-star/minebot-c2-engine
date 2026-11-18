@@ -1,9 +1,23 @@
+# Dependencias e Cache
 node_modules/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+.npm/
+__pycache__/
+
+# Backups gerados pelos nossos patches
+*.bak
+*.old
+*.orig
+
+# Zero-Trust / Seguranca (NUNCA VAZAR)
 .env
-.env.local
-*.log
+.env.*
+*.pem
+*.key
+*.rsa
+secrets/
+
+# OS/Logs
 .DS_Store
 Thumbs.db
+*.log
